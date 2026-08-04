@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BRICK 投票文言ジェネレーター</title>
+<style>
+  :root{
+    --bg:#F7F6F2;
+    --ink:#232323;
+    --ink-soft:#6B6862;
+    --card:#FFFFFF;
+    --border:#E3E0D8;
+    --border-strong:#CFCBBF;
+    --kinyo:#2F6B4F;
+    --kinyo-bg:#E4EFE8;
+    --kinyo-bg-strong:#BFDCCB;
+    --nichiyo:#C4472B;
+    --nichiyo-bg:#F7E4DE;
+    --nichiyo-bg-strong:#F0C0B0;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
+    padding-bottom:96px;
+  }
+  .wrap{max-width:520px;margin:0 auto;padding:20px 16px 40px;}
+  header{margin-bottom:20px;}
+  .eyebrow{
+    font-size:11px;
+    letter-spacing:0.08em;
+    color:var(--ink-soft);
+    font-weight:600;
+    text-transform:uppercase;
+  }
+  h1{
+    font-size:20px;
+    font-weight:700;
+    margin:4px 0 0;
+    letter-spacing:-0.01em;
+  }
+  .step{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:16px;
+    margin-bottom:14px;
+  }
+  .step-head{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:12px;
+  }
+  .step-num{
+    width:22px;height:22px;
+    border-radius:50%;
+    background:var(--ink);
+    color:#fff;
+    font-size:12px;
+    font-weight:700;
+    display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;
+  }
+  .step-title{font-size:15px;font-weight:700;}
+  .step-hint{font-size:12px;color:var(--ink-soft);margin:2px 0 0;line-height:1.5;}
+
+  label{font-size:13px;font-weight:600;color:var(--ink-soft);display:block;margin-bottom:6px;}
+  input[type=text]{
+    width:100%;
+    padding:10px 12px;
+    border:1px solid var(--border-strong);
+    border-radius:var(--radius);
+    font-size:15px;
+    background:#fff;
+    color:var(--ink);
+  }
+  input[type=text]:focus{outline:2px solid var(--kinyo);outline-offset:1px;}
+
+  .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .cal-nav button{
+    background:none;border:1px solid var(--border-strong);border-radius:8px;
+    width:32px;height:32px;font-size:16px;color:var(--ink);
+  }
+  .cal-month-label{font-size:14px;font-weight:700;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+  .cal-dow{font-size:11px;text-align:center;color:var(--ink-soft);padding-bottom:4px;font-weight:600;}
+  .cal-cell{
+    aspect-ratio:1;
+    border-radius:8px;
+    border:1px solid var(--border);
+    background:#fff;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-size:13px;
+    position:relative;
+    cursor:pointer;
+    user-select:none;
+    -webkit-tap-highlight-color:transparent;
+    transition:transform 0.08s ease;
+  }
+  .cal-cell:active{transform:scale(0.93);}
+  .cal-cell.empty{visibility:hidden;pointer-events:none;}
+  .cal-cell.past{opacity:0.3;pointer-events:none;}
+  .cal-cell .mark{font-size:14px;line-height:1;margin-top:2px;}
+  .cal-cell.sel-kinyo{background:var(--kinyo-bg);border-color:var(--kinyo);color:var(--kinyo);font-weight:700;}
+  .cal-cell.sel-nichiyo{background:var(--nichiyo-bg);border-color:var(--nichiyo);color:var(--nichiyo);font-weight:700;}
+  .cal-legend{display:flex;gap:16px;margin-top:10px;font-size:12px;color:var(--ink-soft);}
+  .cal-legend span{display:inline-flex;align-items:center;gap:5px;}
+  .swatch{width:12px;height:12px;border-radius:4px;display:inline-block;}
+  .swatch.k{background:var(--kinyo-bg-strong);border:1px solid var(--kinyo);}
+  .swatch.n{background:var(--nichiyo-bg-strong);border:1px solid var(--nichiyo);}
+
+  .cand-empty{
+    font-size:13px;color:var(--ink-soft);
+    text-align:center;padding:20px 0;
+  }
+  .cand-list{display:flex;flex-direction:column;gap:8px;}
+  .cand-row{
+    display:flex;align-items:center;gap:8px;
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:8px 10px;
+    background:#fdfcfa;
+  }
+  .cand-row.checked{border-color:var(--border-strong);background:#fff;}
+  .cand-row input[type=checkbox]{width:18px;height:18px;flex-shrink:0;}
+  .cand-date{
+    font-size:13px;font-weight:700;
+    min-width:78px;
+    display:flex;align-items:center;gap:4px;
+  }
+  .cand-date .mark-inline{font-size:14px;}
+  .cand-row.kinyo .cand-date{color:var(--kinyo);}
+  .cand-row.nichiyo .cand-date{color:var(--nichiyo);}
+  .cand-time{display:flex;align-items:center;gap:3px;font-size:12px;}
+  .cand-time select{
+    border:1px solid var(--border-strong);
+    border-radius:6px;
+    padding:4px 4px;
+    font-size:12px;
+    background:#fff;
+    color:var(--ink);
+    max-width:64px;
+  }
+  .cand-note{flex:1;min-width:0;}
+  .cand-note input{
+    width:100%;
+    border:1px solid var(--border-strong);
+    border-radius:6px;
+    padding:5px 6px;
+    font-size:12px;
+    background:#fff;
+  }
+  .cand-del{
+    background:none;border:none;color:var(--ink-soft);font-size:16px;
+    width:24px;height:24px;flex-shrink:0;cursor:pointer;
+  }
+
+  .bulk-bar{
+    display:none;
+    align-items:center;
+    gap:8px;
+    background:#F1F0EA;
+    border:1px solid var(--border-strong);
+    border-radius:10px;
+    padding:10px;
+    margin-top:10px;
+    flex-wrap:wrap;
+  }
+  .bulk-bar.active{display:flex;}
+  .bulk-bar .bulk-label{font-size:12px;font-weight:700;color:var(--ink-soft);width:100%;}
+  .bulk-bar select{
+    border:1px solid var(--border-strong);
+    border-radius:6px;padding:5px 6px;font-size:12px;background:#fff;
+  }
+  .bulk-bar button{
+    border:1px solid var(--border-strong);
+    background:#fff;border-radius:6px;
+    padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;
+  }
+
+  .clip-row{display:flex;gap:8px;margin-top:10px;}
+  .clip-row input{flex:1;font-size:12px;padding:8px 10px;border:1px solid var(--border-strong);border-radius:8px;}
+  .clip-btn{
+    border:1px solid var(--border-strong);
+    background:#fff;border-radius:8px;
+    padding:8px 12px;font-size:12px;font-weight:600;
+    white-space:nowrap;cursor:pointer;
+  }
+
+  .output-box{
+    white-space:pre-wrap;
+    font-size:13px;
+    line-height:1.7;
+    background:#fdfcfa;
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:12px;
+    min-height:40px;
+    color:var(--ink);
+  }
+  .output-empty{color:var(--ink-soft);font-size:13px;}
+
+  .bottom-bar{
+    position:sticky;
+    bottom:0;
+    left:0;right:0;
+    background:linear-gradient(to top, var(--bg) 70%, transparent);
+    padding:14px 16px 18px;
+    margin-top:8px;
+  }
+  .copy-main{
+    max-width:520px;margin:0 auto;
+    display:flex;gap:8px;
+  }
+  .copy-main button{
+    flex:1;
+    background:var(--ink);
+    color:#fff;
+    border:none;
+    border-radius:12px;
+    padding:14px;
+    font-size:15px;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .copy-main button:active{transform:scale(0.98);}
+  .copy-main .count-badge{
+    font-size:12px;
+    font-weight:600;
+    color:var(--ink-soft);
+    display:flex;align-items:center;padding:0 4px;
+    white-space:nowrap;
+  }
+  .toast{
+    position:fixed;
+    bottom:90px;left:50%;
+    transform:translateX(-50%) translateY(10px);
+    background:var(--ink);color:#fff;
+    padding:8px 16px;border-radius:20px;
+    font-size:13px;font-weight:600;
+    opacity:0;pointer-events:none;
+    transition:opacity 0.2s ease, transform 0.2s ease;
+    z-index:50;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">BRICK volleyball</div>
+    <h1>投票文言ジェネレーター</h1>
+  </header>
+
+  <div class="step">
+    <div class="step-head">
+      <div class="step-num">1</div>
+      <div>
+        <div class="step-title">開催日を選ぶ</div>
+        <p class="step-hint">タップで切り替え：なし →🔰（金）→🔥（日）→ なし</p>
+      </div>
+    </div>
+    <div class="cal-nav">
+      <button id="prevMonth" aria-label="前の月">‹</button>
+      <div class="cal-month-label" id="monthLabel"></div>
+      <button id="nextMonth" aria-label="次の月">›</button>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="cal-legend">
+      <span><span class="swatch k"></span>🔰 金曜想定</span>
+      <span><span class="swatch n"></span>🔥 日曜想定</span>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head">
+      <div class="step-num">2</div>
+      <div>
+        <div class="step-title">時間・備考を調整</div>
+        <p class="step-hint">選んだ日が時系列順に並びます。チェックした日をまとめて編集できます。</p>
+      </div>
+    </div>
+    <div id="candList">
+      <div class="cand-empty">まだ開催日が選ばれていません</div>
+    </div>
+    <div class="bulk-bar" id="bulkBar">
+      <div class="bulk-label">チェックした日をまとめて変更</div>
+      <select id="bulkStart"></select>
+      <span style="font-size:12px;color:var(--ink-soft);">〜</span>
+      <select id="bulkEnd"></select>
+      <button id="bulkApplyTime">時間を適用</button>
+      <button id="bulkApplyNote">備考を貼付</button>
+    </div>
+    <div class="clip-row">
+      <input type="text" id="noteClip" placeholder="備考メモ（コピペ用）例：※水曜開催">
+      <button class="clip-btn" id="copyNoteBtn">コピー</button>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head">
+      <div class="step-num">3</div>
+      <div>
+        <div class="step-title">投票文言</div>
+      </div>
+    </div>
+    <div class="output-box" id="outputBox"><span class="output-empty">開催日を選ぶと、ここにLINE投票用の文言が表示されます</span></div>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <div class="copy-main">
+    <button id="copyAllBtn">投票文言をコピー</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  var state = {
+    candidates: {},
+    viewYear: null,
+    viewMonth: null
+  };
+
+  var today = new Date();
+  today.setHours(0,0,0,0);
+  state.viewYear = today.getFullYear();
+  state.viewMonth = today.getMonth();
+
+  var MARK = { none:0, kinyo:1, nichiyo:2 };
+  var TIME_OPTIONS = [];
+  for(var h=6; h<=23; h++){
+    TIME_OPTIONS.push(pad(h)+':00');
+    TIME_OPTIONS.push(pad(h)+':30');
+  }
+  function pad(n){ return n<10 ? '0'+n : ''+n; }
+
+  function keyOf(y,m,d){ return y+'-'+pad(m+1)+'-'+pad(d); }
+
+  function defaultTimeFor(dow){
+    if(dow === 5) return {start:'19:30', end:'21:30'};
+    if(dow === 0) return {start:'19:00', end:'21:00'};
+    return {start:'19:00', end:'21:00'};
+  }
+  function defaultMarkFor(dow){
+    if(dow === 5) return MARK.kinyo;
+    if(dow === 0) return MARK.nichiyo;
+    return MARK.kinyo;
+  }
+
+  var monthLabel = document.getElementById('monthLabel');
+  var calGrid = document.getElementById('calGrid');
+  var candList = document.getElementById('candList');
+  var bulkBar = document.getElementById('bulkBar');
+  var bulkStart = document.getElementById('bulkStart');
+  var bulkEnd = document.getElementById('bulkEnd');
+  var outputBox = document.getElementById('outputBox');
+  var noteClip = document.getElementById('noteClip');
+  var toast = document.getElementById('toast');
+
+  TIME_OPTIONS.forEach(function(t){
+    var o1 = document.createElement('option'); o1.value=t; o1.textContent=t;
+    bulkStart.appendChild(o1);
+    var o2 = document.createElement('option'); o2.value=t; o2.textContent=t;
+    bulkEnd.appendChild(o2);
+  });
+  bulkStart.value = '19:00';
+  bulkEnd.value = '21:00';
+
+  function showToast(msg){
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(function(){ toast.classList.remove('show'); }, 1600);
+  }
+
+  function renderCalendar(){
+    var y = state.viewYear, m = state.viewMonth;
+    monthLabel.textContent = y + '年' + (m+1) + '月';
+    calGrid.innerHTML = '';
+    var dows = ['日','月','火','水','木','金','土'];
+    dows.forEach(function(d){
+      var el = document.createElement('div');
+      el.className = 'cal-dow';
+      el.textContent = d;
+      calGrid.appendChild(el);
+    });
+    var firstDow = new Date(y,m,1).getDay();
+    var daysInMonth = new Date(y,m+1,0).getDate();
+    for(var i=0;i<firstDow;i++){
+      var empty = document.createElement('div');
+      empty.className = 'cal-cell empty';
+      calGrid.appendChild(empty);
+    }
+    for(var d=1; d<=daysInMonth; d++){
+      (function(d){
+        var cellDate = new Date(y,m,d);
+        var dow = cellDate.getDay();
+        var key = keyOf(y,m,d);
+        var cell = document.createElement('div');
+        cell.className = 'cal-cell';
+        if(cellDate < today) cell.className += ' past';
+        var numEl = document.createElement('div');
+        numEl.textContent = d;
+        cell.appendChild(numEl);
+        var markEl = document.createElement('div');
+        markEl.className = 'mark';
+        cell.appendChild(markEl);
+
+        function applyVisual(){
+          cell.classList.remove('sel-kinyo','sel-nichiyo');
+          var c = state.candidates[key];
+          if(!c){ markEl.textContent=''; return; }
+          if(c.mark === MARK.kinyo){ cell.classList.add('sel-kinyo'); markEl.textContent = '🔰'; }
+          else if(c.mark === MARK.nichiyo){ cell.classList.add('sel-nichiyo'); markEl.textContent = '🔥'; }
+        }
+
+        cell.addEventListener('click', function(){
+          var existing = state.candidates[key];
+          var currentMark = existing ? existing.mark : MARK.none;
+          var nextMark = (currentMark + 1) % 3;
+          if(nextMark === MARK.none){
+            delete state.candidates[key];
+          } else {
+            var t = existing ? {start:existing.start,end:existing.end} : defaultTimeFor(dow);
+            var note = existing ? existing.note : '';
+            state.candidates[key] = {
+              y:y, m:m, d:d, dow:dow,
+              mark: nextMark,
+              start: t.start, end: t.end,
+              note: note,
+              checked: existing ? existing.checked : false
+            };
+          }
+          applyVisual();
+          renderCandidates();
+          renderOutput();
+        });
+
+        applyVisual();
+        calGrid.appendChild(cell);
+      })(d);
+    }
+  }
+
+  function sortedKeys(){
+    return Object.keys(state.candidates).sort(function(a,b){
+      var ca = state.candidates[a], cb = state.candidates[b];
+      var da = new Date(ca.y,ca.m,ca.d), db = new Date(cb.y,cb.m,cb.d);
+      return da - db;
+    });
+  }
+
+  function renderCandidates(){
+    var keys = sortedKeys();
+    if(keys.length === 0){
+      candList.innerHTML = '<div class="cand-empty">まだ開催日が選ばれていません</div>';
+      bulkBar.classList.remove('active');
+      return;
+    }
+    candList.innerHTML = '';
+    keys.forEach(function(key){
+      var c = state.candidates[key];
+      var row = document.createElement('div');
+      row.className = 'cand-row ' + (c.checked ? 'checked' : '') + ' ' + (c.mark===MARK.kinyo?'kinyo':'nichiyo');
+
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = !!c.checked;
+      cb.setAttribute('aria-label', key + 'を選択');
+      cb.addEventListener('change', function(){
+        c.checked = cb.checked;
+        row.classList.toggle('checked', cb.checked);
+        updateBulkBar();
+      });
+      row.appendChild(cb);
+
+      var dateEl = document.createElement('div');
+      dateEl.className = 'cand-date';
+      var dowLabels = ['日','月','火','水','木','金','土'];
+      dateEl.innerHTML = '<span class="mark-inline">'+(c.mark===MARK.kinyo?'🔰':'🔥')+'</span>'+(c.m+1)+'/'+c.d+'('+dowLabels[c.dow]+')';
+      row.appendChild(dateEl);
+
+      var timeWrap = document.createElement('div');
+      timeWrap.className = 'cand-time';
+      var startSel = buildTimeSelect(c.start, function(v){ c.start = v; renderOutput(); });
+      var sep = document.createElement('span'); sep.textContent='-'; sep.style.color='var(--ink-soft)';
+      var endSel = buildTimeSelect(c.end, function(v){ c.end = v; renderOutput(); });
+      timeWrap.appendChild(startSel);
+      timeWrap.appendChild(sep);
+      timeWrap.appendChild(endSel);
+      row.appendChild(timeWrap);
+
+      var noteWrap = document.createElement('div');
+      noteWrap.className = 'cand-note';
+      var noteInput = document.createElement('input');
+      noteInput.type = 'text';
+      noteInput.placeholder = '備考';
+      noteInput.value = c.note || '';
+      noteInput.addEventListener('input', function(){ c.note = noteInput.value; renderOutput(); });
+      noteWrap.appendChild(noteInput);
+      row.appendChild(noteWrap);
+
+      var delBtn = document.createElement('button');
+      delBtn.className = 'cand-del';
+      delBtn.innerHTML = '&times;';
+      delBtn.setAttribute('aria-label', '削除');
+      delBtn.addEventListener('click', function(){
+        delete state.candidates[key];
+        renderCalendar();
+        renderCandidates();
+        renderOutput();
+      });
+      row.appendChild(delBtn);
+
+      candList.appendChild(row);
+    });
+    updateBulkBar();
+  }
+
+  function buildTimeSelect(value, onChange){
+    var sel = document.createElement('select');
+    TIME_OPTIONS.forEach(function(t){
+      var o = document.createElement('option');
+      o.value = t; o.textContent = t;
+      if(t === value) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change', function(){ onChange(sel.value); });
+    return sel;
+  }
+
+  function updateBulkBar(){
+    var anyChecked = Object.keys(state.candidates).some(function(k){ return state.candidates[k].checked; });
+    bulkBar.classList.toggle('active', anyChecked);
+  }
+
+  document.getElementById('bulkApplyTime').addEventListener('click', function(){
+    var s = bulkStart.value, e = bulkEnd.value;
+    Object.keys(state.candidates).forEach(function(k){
+      var c = state.candidates[k];
+      if(c.checked){ c.start = s; c.end = e; }
+    });
+    renderCandidates();
+    renderOutput();
+    showToast('時間を適用しました');
+  });
+
+  document.getElementById('bulkApplyNote').addEventListener('click', function(){
+    var note = noteClip.value;
+    if(!note){ showToast('備考メモを入力してください'); return; }
+    Object.keys(state.candidates).forEach(function(k){
+      var c = state.candidates[k];
+      if(c.checked){ c.note = note; }
+    });
+    renderCandidates();
+    renderOutput();
+    showToast('備考を貼り付けました');
+  });
+
+  document.getElementById('copyNoteBtn').addEventListener('click', function(){
+    copyText(noteClip.value).then(function(){ showToast('コピーしました'); });
+  });
+
+  document.getElementById('prevMonth').addEventListener('click', function(){
+    state.viewMonth--;
+    if(state.viewMonth < 0){ state.viewMonth = 11; state.viewYear--; }
+    renderCalendar();
+  });
+  document.getElementById('nextMonth').addEventListener('click', function(){
+    state.viewMonth++;
+    if(state.viewMonth > 11){ state.viewMonth = 0; state.viewYear++; }
+    renderCalendar();
+  });
+
+  function buildOutputText(){
+    var keys = sortedKeys();
+    if(keys.length === 0) return '';
+    var dowLabels = ['日','月','火','水','木','金','土'];
+    var lines = [];
+    keys.forEach(function(key){
+      var c = state.candidates[key];
+      var mark = c.mark === MARK.kinyo ? '🔰' : '🔥';
+      var noteStr = c.note ? '　'+c.note : '';
+      lines.push('・'+mark+(c.m+1)+'/'+c.d+'('+dowLabels[c.dow]+')'+c.start+'-'+c.end+noteStr);
+    });
+    return lines.join('\n');
+  }
+
+  function renderOutput(){
+    var text = buildOutputText();
+    if(!text){
+      outputBox.innerHTML = '<span class="output-empty">開催日を選ぶと、ここにLINE投票用の文言が表示されます</span>';
+    } else {
+      outputBox.textContent = text;
+    }
+  }
+
+  function copyText(text){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      return navigator.clipboard.writeText(text).catch(function(){ return fallbackCopy(text); });
+    }
+    return fallbackCopy(text);
+  }
+  function fallbackCopy(text){
+    return new Promise(function(resolve){
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      try{ document.execCommand('copy'); }catch(e){}
+      document.body.removeChild(ta);
+      resolve();
+    });
+  }
+
+  document.getElementById('copyAllBtn').addEventListener('click', function(){
+    var text = buildOutputText();
+    if(!text){ showToast('先に開催日を選んでください'); return; }
+    copyText(text).then(function(){ showToast('投票文言をコピーしました'); });
+  });
+
+  renderCalendar();
+  renderCandidates();
+  renderOutput();
+})();
+</script>
+</body>
+</html>
