@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BRICK 投票文言ジェネレーター</title>
+<title>BRICK LINE投票支援ツール</title>
 <style>
   :root{
     --bg:#F7F6F2;
@@ -120,7 +120,7 @@
   }
   .cand-list{display:flex;flex-direction:column;gap:8px;}
   .cand-row{
-    display:flex;align-items:center;gap:8px;
+    display:flex;flex-direction:column;
     border:1px solid var(--border);
     border-radius:10px;
     padding:8px 10px;
@@ -128,36 +128,48 @@
   }
   .cand-row.checked{border-color:var(--border-strong);background:#fff;}
   .cand-row input[type=checkbox]{width:18px;height:18px;flex-shrink:0;}
+  .cand-top{display:flex;align-items:center;gap:6px;}
   .cand-date{
     font-size:13px;font-weight:700;
-    min-width:78px;
+    min-width:74px;
     display:flex;align-items:center;gap:4px;
   }
   .cand-date .mark-inline{font-size:14px;}
   .cand-row.kinyo .cand-date{color:var(--kinyo);}
   .cand-row.nichiyo .cand-date{color:var(--nichiyo);}
-  .cand-time{display:flex;align-items:center;gap:3px;font-size:12px;}
+  .cand-time{display:flex;align-items:center;gap:3px;font-size:12px;flex-shrink:0;}
   .cand-time select{
     border:1px solid var(--border-strong);
     border-radius:6px;
-    padding:4px 4px;
+    padding:4px 3px;
     font-size:12px;
     background:#fff;
     color:var(--ink);
-    max-width:64px;
+    width:62px;
   }
-  .cand-note{flex:1;min-width:0;}
+  .cand-note-toggle{
+    background:none;border:none;color:var(--ink-soft);font-size:16px;
+    width:26px;height:26px;flex-shrink:0;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    margin-left:auto;
+  }
+  .cand-note-toggle.has-note{color:var(--ink);font-weight:700;}
+  .cand-del{
+    background:none;border:none;color:var(--ink-soft);font-size:16px;
+    width:24px;height:24px;flex-shrink:0;cursor:pointer;
+  }
+  .cand-note{
+    display:none;
+    margin-top:8px;
+  }
+  .cand-note.open{display:block;}
   .cand-note input{
     width:100%;
     border:1px solid var(--border-strong);
     border-radius:6px;
-    padding:5px 6px;
-    font-size:12px;
+    padding:7px 8px;
+    font-size:13px;
     background:#fff;
-  }
-  .cand-del{
-    background:none;border:none;color:var(--ink-soft);font-size:16px;
-    width:24px;height:24px;flex-shrink:0;cursor:pointer;
   }
 
   .bulk-bar{
@@ -192,17 +204,32 @@
     white-space:nowrap;cursor:pointer;
   }
 
-  .output-box{
-    white-space:pre-wrap;
-    font-size:13px;
-    line-height:1.7;
+  .out-row{
+    display:flex;align-items:center;gap:10px;
     background:#fdfcfa;
     border:1px solid var(--border);
     border-radius:10px;
-    padding:12px;
-    min-height:40px;
-    color:var(--ink);
+    padding:10px 12px;
+    margin-bottom:8px;
+    font-size:13px;
   }
+  .out-row.done{opacity:0.45;}
+  .out-row .out-idx{
+    font-size:11px;font-weight:700;color:var(--ink-soft);
+    width:18px;flex-shrink:0;
+  }
+  .out-row .out-text{flex:1;line-height:1.5;word-break:break-all;}
+  .out-row .out-copy{
+    flex-shrink:0;
+    border:1px solid var(--border-strong);
+    background:#fff;
+    border-radius:8px;
+    padding:6px 12px;
+    font-size:12px;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .out-row.done .out-copy{background:var(--ink);color:#fff;border-color:var(--ink);}
   .output-empty{color:var(--ink-soft);font-size:13px;}
 
   .bottom-bar{
@@ -229,6 +256,7 @@
     cursor:pointer;
   }
   .copy-main button:active{transform:scale(0.98);}
+  .copy-main button:disabled{background:var(--border-strong);color:#fff;cursor:default;}
   .copy-main .count-badge{
     font-size:12px;
     font-weight:600;
@@ -307,15 +335,16 @@
       <div class="step-num">3</div>
       <div>
         <div class="step-title">投票文言</div>
+        <p class="step-hint">LINE投票は改行での自動分割に対応していないため、1項目ずつコピーして選択肢欄に貼り付けてください。</p>
       </div>
     </div>
-    <div class="output-box" id="outputBox"><span class="output-empty">開催日を選ぶと、ここにLINE投票用の文言が表示されます</span></div>
+    <div id="outputList"><div class="output-empty">開催日を選ぶと、ここに項目ごとの文言が表示されます</div></div>
   </div>
 </div>
 
 <div class="bottom-bar">
   <div class="copy-main">
-    <button id="copyAllBtn">投票文言をコピー</button>
+    <button id="copyNextBtn">1件目をコピー</button>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -325,7 +354,8 @@
   var state = {
     candidates: {},
     viewYear: null,
-    viewMonth: null
+    viewMonth: null,
+    copyPointer: 0
   };
 
   var today = new Date();
@@ -360,7 +390,8 @@
   var bulkBar = document.getElementById('bulkBar');
   var bulkStart = document.getElementById('bulkStart');
   var bulkEnd = document.getElementById('bulkEnd');
-  var outputBox = document.getElementById('outputBox');
+  var outputList = document.getElementById('outputList');
+  var copyNextBtn = document.getElementById('copyNextBtn');
   var noteClip = document.getElementById('noteClip');
   var toast = document.getElementById('toast');
 
@@ -440,6 +471,7 @@
           }
           applyVisual();
           renderCandidates();
+          state.copyPointer = 0;
           renderOutput();
         });
 
@@ -470,6 +502,9 @@
       var row = document.createElement('div');
       row.className = 'cand-row ' + (c.checked ? 'checked' : '') + ' ' + (c.mark===MARK.kinyo?'kinyo':'nichiyo');
 
+      var topWrap = document.createElement('div');
+      topWrap.className = 'cand-top';
+
       var cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.checked = !!c.checked;
@@ -479,13 +514,13 @@
         row.classList.toggle('checked', cb.checked);
         updateBulkBar();
       });
-      row.appendChild(cb);
+      topWrap.appendChild(cb);
 
       var dateEl = document.createElement('div');
       dateEl.className = 'cand-date';
       var dowLabels = ['日','月','火','水','木','金','土'];
       dateEl.innerHTML = '<span class="mark-inline">'+(c.mark===MARK.kinyo?'🔰':'🔥')+'</span>'+(c.m+1)+'/'+c.d+'('+dowLabels[c.dow]+')';
-      row.appendChild(dateEl);
+      topWrap.appendChild(dateEl);
 
       var timeWrap = document.createElement('div');
       timeWrap.className = 'cand-time';
@@ -495,7 +530,7 @@
       timeWrap.appendChild(startSel);
       timeWrap.appendChild(sep);
       timeWrap.appendChild(endSel);
-      row.appendChild(timeWrap);
+      topWrap.appendChild(timeWrap);
 
       var noteWrap = document.createElement('div');
       noteWrap.className = 'cand-note';
@@ -503,9 +538,22 @@
       noteInput.type = 'text';
       noteInput.placeholder = '備考';
       noteInput.value = c.note || '';
-      noteInput.addEventListener('input', function(){ c.note = noteInput.value; renderOutput(); });
+      noteInput.addEventListener('input', function(){
+        c.note = noteInput.value;
+        noteToggle.classList.toggle('has-note', !!noteInput.value);
+        renderOutput();
+      });
       noteWrap.appendChild(noteInput);
-      row.appendChild(noteWrap);
+
+      var noteToggle = document.createElement('button');
+      noteToggle.className = 'cand-note-toggle' + (c.note ? ' has-note' : '');
+      noteToggle.textContent = '📝';
+      noteToggle.setAttribute('aria-label', '備考を編集');
+      noteToggle.addEventListener('click', function(){
+        noteWrap.classList.toggle('open');
+        if(noteWrap.classList.contains('open')) noteInput.focus();
+      });
+      topWrap.appendChild(noteToggle);
 
       var delBtn = document.createElement('button');
       delBtn.className = 'cand-del';
@@ -515,9 +563,13 @@
         delete state.candidates[key];
         renderCalendar();
         renderCandidates();
+        state.copyPointer = 0;
         renderOutput();
       });
-      row.appendChild(delBtn);
+      topWrap.appendChild(delBtn);
+
+      row.appendChild(topWrap);
+      row.appendChild(noteWrap);
 
       candList.appendChild(row);
     });
@@ -579,26 +631,56 @@
     renderCalendar();
   });
 
-  function buildOutputText(){
+  function buildOutputLines(){
     var keys = sortedKeys();
-    if(keys.length === 0) return '';
     var dowLabels = ['日','月','火','水','木','金','土'];
-    var lines = [];
-    keys.forEach(function(key){
+    return keys.map(function(key){
       var c = state.candidates[key];
       var mark = c.mark === MARK.kinyo ? '🔰' : '🔥';
       var noteStr = c.note ? '　'+c.note : '';
-      lines.push('・'+mark+(c.m+1)+'/'+c.d+'('+dowLabels[c.dow]+')'+c.start+'-'+c.end+noteStr);
+      return mark+(c.m+1)+'/'+c.d+'('+dowLabels[c.dow]+')'+c.start+'-'+c.end+noteStr;
     });
-    return lines.join('\n');
   }
 
   function renderOutput(){
-    var text = buildOutputText();
-    if(!text){
-      outputBox.innerHTML = '<span class="output-empty">開催日を選ぶと、ここにLINE投票用の文言が表示されます</span>';
+    var lines = buildOutputLines();
+    if(state.copyPointer > lines.length) state.copyPointer = 0;
+    if(lines.length === 0){
+      outputList.innerHTML = '<div class="output-empty">開催日を選ぶと、ここに項目ごとの文言が表示されます</div>';
+      copyNextBtn.textContent = '1件目をコピー';
+      copyNextBtn.disabled = true;
+      return;
+    }
+    copyNextBtn.disabled = false;
+    outputList.innerHTML = '';
+    lines.forEach(function(line, i){
+      var row = document.createElement('div');
+      row.className = 'out-row' + (i < state.copyPointer ? ' done' : '');
+      var idx = document.createElement('div');
+      idx.className = 'out-idx';
+      idx.textContent = (i+1);
+      var textEl = document.createElement('div');
+      textEl.className = 'out-text';
+      textEl.textContent = line;
+      var btn = document.createElement('button');
+      btn.className = 'out-copy';
+      btn.textContent = i < state.copyPointer ? '済' : 'コピー';
+      btn.addEventListener('click', function(){
+        copyText(line).then(function(){
+          state.copyPointer = Math.max(state.copyPointer, i+1);
+          showToast((i+1)+'件目をコピーしました');
+          renderOutput();
+        });
+      });
+      row.appendChild(idx);
+      row.appendChild(textEl);
+      row.appendChild(btn);
+      outputList.appendChild(row);
+    });
+    if(state.copyPointer >= lines.length){
+      copyNextBtn.textContent = '全件コピー済み（最初から）';
     } else {
-      outputBox.textContent = text;
+      copyNextBtn.textContent = (state.copyPointer+1)+'件目をコピー';
     }
   }
 
@@ -622,10 +704,16 @@
     });
   }
 
-  document.getElementById('copyAllBtn').addEventListener('click', function(){
-    var text = buildOutputText();
-    if(!text){ showToast('先に開催日を選んでください'); return; }
-    copyText(text).then(function(){ showToast('投票文言をコピーしました'); });
+  copyNextBtn.addEventListener('click', function(){
+    var lines = buildOutputLines();
+    if(lines.length === 0){ showToast('先に開催日を選んでください'); return; }
+    if(state.copyPointer >= lines.length) state.copyPointer = 0;
+    var i = state.copyPointer;
+    copyText(lines[i]).then(function(){
+      state.copyPointer = i + 1;
+      showToast((i+1)+'件目をコピーしました');
+      renderOutput();
+    });
   });
 
   renderCalendar();
