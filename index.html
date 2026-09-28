@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BRICK LINE投票支援ツール</title>
+<title>BRICK 投票文言ジェネレーター</title>
 <style>
   :root{
     --bg:#F7F6F2;
@@ -42,6 +42,16 @@
     font-weight:700;
     margin:4px 0 0;
     letter-spacing:-0.01em;
+  }
+  .version-tag{
+    display:inline-block;
+    margin-top:6px;
+    font-size:11px;
+    font-weight:600;
+    color:var(--ink-soft);
+    background:#EDEBE4;
+    border-radius:20px;
+    padding:2px 8px;
   }
   .step{
     background:var(--card);
@@ -240,6 +250,18 @@
     padding:14px 16px 18px;
     margin-top:8px;
   }
+  .auto-switch-row{
+    max-width:520px;margin:0 auto 8px;
+  }
+  .auto-switch{
+    display:flex;align-items:center;gap:8px;
+    font-size:12px;
+    color:var(--ink-soft);
+    font-weight:600;
+    cursor:pointer;
+    user-select:none;
+  }
+  .auto-switch input{width:16px;height:16px;flex-shrink:0;}
   .copy-main{
     max-width:520px;margin:0 auto;
     display:flex;gap:8px;
@@ -264,6 +286,51 @@
     display:flex;align-items:center;padding:0 4px;
     white-space:nowrap;
   }
+  .cal-img-controls{margin-bottom:12px;}
+  .cal-img-controls select{
+    width:100%;
+    padding:10px 12px;
+    border:1px solid var(--border-strong);
+    border-radius:var(--radius);
+    font-size:14px;
+    background:#fff;
+    color:var(--ink);
+  }
+  .cal-img-preview-wrap{
+    position:relative;
+    border-radius:12px;
+    overflow:hidden;
+    background:#EDEBE4;
+    border:1px solid var(--border);
+  }
+  .cal-img-preview-wrap canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  .cal-img-empty{
+    position:absolute;
+    inset:0;
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px;color:var(--ink-soft);
+    text-align:center;
+    padding:0 24px;
+  }
+  .cal-img-download{
+    width:100%;
+    margin-top:12px;
+    background:var(--ink);
+    color:#fff;
+    border:none;
+    border-radius:12px;
+    padding:13px;
+    font-size:14px;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .cal-img-download:active{transform:scale(0.98);}
+  .cal-img-download:disabled{background:var(--border-strong);cursor:default;}
+
   .toast{
     position:fixed;
     bottom:90px;left:50%;
@@ -282,7 +349,8 @@
 <div class="wrap">
   <header>
     <div class="eyebrow">BRICK volleyball</div>
-    <h1>LINE投票支援ツール</h1>
+    <h1>投票文言ジェネレーター</h1>
+    <div class="version-tag">v1.3.0</div>
   </header>
 
   <div class="step">
@@ -340,9 +408,33 @@
     </div>
     <div id="outputList"><div class="output-empty">開催日を選ぶと、ここに項目ごとの文言が表示されます</div></div>
   </div>
+
+  <div class="step">
+    <div class="step-head">
+      <div class="step-num">4</div>
+      <div>
+        <div class="step-title">カレンダー画像を作成</div>
+        <p class="step-hint">SNS告知用の画像を作れます。翌月に日をまたいで選んでいる場合は対象月を選んでください。</p>
+      </div>
+    </div>
+    <div class="cal-img-controls">
+      <select id="calImgMonthSelect"></select>
+    </div>
+    <div class="cal-img-preview-wrap">
+      <canvas id="calImgCanvas" width="1080" height="1080"></canvas>
+      <div class="cal-img-empty" id="calImgEmpty">開催日を選ぶと、ここにプレビューが表示されます</div>
+    </div>
+    <button class="cal-img-download" id="calImgDownloadBtn">画像をダウンロード</button>
+  </div>
 </div>
 
 <div class="bottom-bar">
+  <div class="auto-switch-row">
+    <label class="auto-switch">
+      <input type="checkbox" id="autoSwitchToggle" checked>
+      <span>コピーしたら自動でLINEに切り替える</span>
+    </label>
+  </div>
   <div class="copy-main">
     <button id="copyNextBtn">1件目をコピー</button>
   </div>
@@ -392,8 +484,19 @@
   var bulkEnd = document.getElementById('bulkEnd');
   var outputList = document.getElementById('outputList');
   var copyNextBtn = document.getElementById('copyNextBtn');
+  var autoSwitchToggle = document.getElementById('autoSwitchToggle');
   var noteClip = document.getElementById('noteClip');
   var toast = document.getElementById('toast');
+
+  function openLineApp(){
+    var ua = navigator.userAgent || '';
+    var isAndroid = /Android/i.test(ua);
+    if(isAndroid){
+      window.location.href = 'intent://ti/p/#Intent;scheme=line;package=jp.naver.line.android;end';
+    } else {
+      window.location.href = 'line://';
+    }
+  }
 
   TIME_OPTIONS.forEach(function(t){
     var o1 = document.createElement('option'); o1.value=t; o1.textContent=t;
@@ -649,6 +752,7 @@
       outputList.innerHTML = '<div class="output-empty">開催日を選ぶと、ここに項目ごとの文言が表示されます</div>';
       copyNextBtn.textContent = '1件目をコピー';
       copyNextBtn.disabled = true;
+      renderCalendarImage();
       return;
     }
     copyNextBtn.disabled = false;
@@ -670,6 +774,7 @@
           state.copyPointer = Math.max(state.copyPointer, i+1);
           showToast((i+1)+'件目をコピーしました');
           renderOutput();
+          maybeSwitchToLine();
         });
       });
       row.appendChild(idx);
@@ -682,6 +787,7 @@
     } else {
       copyNextBtn.textContent = (state.copyPointer+1)+'件目をコピー';
     }
+    renderCalendarImage();
   }
 
   function copyText(text){
@@ -713,8 +819,16 @@
       state.copyPointer = i + 1;
       showToast((i+1)+'件目をコピーしました');
       renderOutput();
+      maybeSwitchToLine();
     });
   });
+
+  function maybeSwitchToLine(){
+    if(!autoSwitchToggle.checked) return;
+    setTimeout(function(){
+      openLineApp();
+    }, 450);
+  }
 
   renderCalendar();
   renderCandidates();
