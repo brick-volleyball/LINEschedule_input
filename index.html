@@ -830,6 +830,182 @@
     }, 450);
   }
 
+  var calImgMonthSelect = document.getElementById('calImgMonthSelect');
+  var calImgCanvas = document.getElementById('calImgCanvas');
+  var calImgEmpty = document.getElementById('calImgEmpty');
+  var calImgDownloadBtn = document.getElementById('calImgDownloadBtn');
+  var calImgSelectedYM = null;
+
+  function candidateMonthsSorted(){
+    var set = {};
+    Object.keys(state.candidates).forEach(function(k){
+      var c = state.candidates[k];
+      set[c.y+'-'+pad(c.m+1)] = {y:c.y, m:c.m};
+    });
+    return Object.keys(set).sort().map(function(k){ return set[k]; });
+  }
+
+  function renderCalImgMonthOptions(){
+    var months = candidateMonthsSorted();
+    var prevValue = calImgSelectedYM;
+    calImgMonthSelect.innerHTML = '';
+    if(months.length === 0){
+      calImgSelectedYM = null;
+      return;
+    }
+    months.forEach(function(ym){
+      var val = ym.y+'-'+pad(ym.m+1);
+      var opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = ym.y+'年'+(ym.m+1)+'月';
+      calImgMonthSelect.appendChild(opt);
+    });
+    var stillValid = months.some(function(ym){ return (ym.y+'-'+pad(ym.m+1)) === prevValue; });
+    calImgSelectedYM = stillValid ? prevValue : (months[0].y+'-'+pad(months[0].m+1));
+    calImgMonthSelect.value = calImgSelectedYM;
+  }
+
+  calImgMonthSelect.addEventListener('change', function(){
+    calImgSelectedYM = calImgMonthSelect.value;
+    drawCalendarImage();
+  });
+
+  function renderCalendarImage(){
+    renderCalImgMonthOptions();
+    if(!calImgSelectedYM){
+      calImgEmpty.style.display = 'flex';
+      calImgDownloadBtn.disabled = true;
+      var ctx0 = calImgCanvas.getContext('2d');
+      ctx0.clearRect(0,0,calImgCanvas.width,calImgCanvas.height);
+      return;
+    }
+    calImgEmpty.style.display = 'none';
+    calImgDownloadBtn.disabled = false;
+    drawCalendarImage();
+  }
+
+  function drawCalendarImage(){
+    if(!calImgSelectedYM) return;
+    var parts = calImgSelectedYM.split('-');
+    var y = parseInt(parts[0], 10);
+    var m = parseInt(parts[1], 10) - 1;
+
+    var W = 1080, H = 1080;
+    calImgCanvas.width = W;
+    calImgCanvas.height = H;
+    var ctx = calImgCanvas.getContext('2d');
+
+    var COL_BG = '#F7F6F2';
+    var COL_INK = '#232323';
+    var COL_INK_SOFT = '#6B6862';
+    var COL_KINYO = '#2F6B4F';
+    var COL_KINYO_BG = '#E4EFE8';
+    var COL_NICHIYO = '#C4472B';
+    var COL_NICHIYO_BG = '#F7E4DE';
+    var COL_BORDER = '#E3E0D8';
+    var COL_CELL_BG = '#FFFFFF';
+
+    ctx.fillStyle = COL_BG;
+    ctx.fillRect(0,0,W,H);
+
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = COL_INK_SOFT;
+    ctx.font = '600 24px sans-serif';
+    ctx.fillText('BRICK VOLLEYBALL', 56, 90);
+
+    ctx.fillStyle = COL_INK;
+    ctx.font = '700 60px sans-serif';
+    ctx.fillText(y+'年'+(m+1)+'月 活動予定', 56, 160);
+
+    var gridTop = 220;
+    var gridLeft = 40;
+    var gridRight = 40;
+    var gridWidth = W - gridLeft - gridRight;
+    var cellW = gridWidth / 7;
+    var dowLabels = ['日','月','火','水','木','金','土'];
+
+    ctx.font = '600 22px sans-serif';
+    ctx.textAlign = 'center';
+    for(var i=0;i<7;i++){
+      ctx.fillStyle = i===0 ? COL_NICHIYO : (i===6 ? COL_KINYO : COL_INK_SOFT);
+      ctx.fillText(dowLabels[i], gridLeft + cellW*i + cellW/2, gridTop);
+    }
+
+    var firstDow = new Date(y,m,1).getDay();
+    var daysInMonth = new Date(y,m+1,0).getDate();
+    var rows = Math.ceil((firstDow + daysInMonth) / 7);
+    var gridBodyTop = gridTop + 26;
+    var bottomMargin = 90;
+    var availableH = H - gridBodyTop - bottomMargin;
+    var cellH = availableH / rows;
+
+    for(var d=1; d<=daysInMonth; d++){
+      var idx = firstDow + d - 1;
+      var row = Math.floor(idx / 7);
+      var col = idx % 7;
+      var cx = gridLeft + col*cellW;
+      var cy = gridBodyTop + row*cellH;
+      var key = keyOf(y,m,d);
+      var cand = state.candidates[key];
+
+      var bg = COL_CELL_BG;
+      var accent = null;
+      if(cand){
+        if(cand.mark === MARK.kinyo){ bg = COL_KINYO_BG; accent = COL_KINYO; }
+        else { bg = COL_NICHIYO_BG; accent = COL_NICHIYO; }
+      }
+      ctx.fillStyle = bg;
+      ctx.fillRect(cx+3, cy+3, cellW-6, cellH-6);
+      ctx.strokeStyle = COL_BORDER;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(cx+3, cy+3, cellW-6, cellH-6);
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = accent ? accent : COL_INK;
+      ctx.font = (accent ? '700 ' : '400 ') + '26px sans-serif';
+      ctx.fillText(d, cx+14, cy+34);
+
+      if(cand){
+        ctx.font = '20px sans-serif';
+        ctx.fillText(cand.mark===MARK.kinyo ? '🔰' : '🔥', cx+14, cy+64);
+
+        var timeStr = cand.start+'-'+cand.end;
+        ctx.font = '600 17px sans-serif';
+        ctx.fillStyle = accent;
+        wrapCellText(ctx, timeStr, cx+14, cy+cellH-16, cellW-24, 20);
+      }
+    }
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = COL_INK_SOFT;
+    ctx.font = '400 20px sans-serif';
+    ctx.fillText('🔰 金曜(初心者向け)　🔥 日曜(上級者向け)', 56, H-40);
+  }
+
+  function wrapCellText(ctx, text, x, y, maxWidth, lineHeight){
+    if(ctx.measureText(text).width <= maxWidth){
+      ctx.fillText(text, x, y);
+      return;
+    }
+    var parts = text.split('-');
+    if(parts.length === 2){
+      ctx.fillText(parts[0], x, y-lineHeight);
+      ctx.fillText('-'+parts[1], x, y);
+    } else {
+      ctx.fillText(text, x, y);
+    }
+  }
+
+  calImgDownloadBtn.addEventListener('click', function(){
+    if(!calImgSelectedYM) return;
+    var parts = calImgSelectedYM.split('-');
+    var link = document.createElement('a');
+    link.download = 'brick-schedule-'+parts[0]+parts[1]+'.png';
+    link.href = calImgCanvas.toDataURL('image/png');
+    link.click();
+    showToast('画像をダウンロードしました');
+  });
+
   renderCalendar();
   renderCandidates();
   renderOutput();
